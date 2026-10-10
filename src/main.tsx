@@ -151,7 +151,7 @@ function App() {
             {!hasVideo && <div className="empty-canvas"><div className="orbit" aria-hidden="true"><div/><span>✦</span></div><h3>{joined ? status : 'Every world starts with a few words.'}</h3><p>{joined ? 'Your live video will appear here.' : 'Describe your scene, add your key, and let it unfold.'}</p><span className="canvas-label">IMAGINATION, IN REAL TIME</span></div>}
           </div>
           <div className="player-toolbar"><span className="player-status" role="status"><i className={live ? 'is-live' : ''}/>{status}</span><div>{sessionTime && <SessionTimer deadline={sessionTime.deadline} limit={sessionTime.limit}/>}<button className="text-button" disabled={!live || busy} onClick={() => void command('set_paused', { paused: !paused })}>{paused ? '▷ Resume' : 'Ⅱ Pause'}</button></div></div>
-          <div className="stage-footnote"><span>1920 × 1080 <b>·</b> 18 FPS <b>·</b> LIVE AUDIO</span><span>Unmute in player</span></div>
+          <div className="stage-footnote"><span>1920 × 1080 <b>·</b> LIVE AUDIO</span><span>Unmute in player</span></div>
           {error && <div className="message error" role="alert">{error}</div>}{notice && <div className="message" role="status">{notice}</div>}
         </section>
       </div>
