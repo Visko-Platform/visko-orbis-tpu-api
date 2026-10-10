@@ -428,7 +428,7 @@ request bodies to `/join` or `/status`.
 
 Incoming tracks are named `main_video` and `main_audio`. Add both to a
 `MediaStream` attached to a `<video>` element, as in the example. Current output
-is 2560×1440 at 18 fps with mono audio transported at 48 kHz. HTTPS carries API
+is 1920×1080 (1080p) at 18 fps with mono audio transported at 48 kHz. HTTPS carries API
 calls and signalling; WebRTC carries media and stream commands.
 
 ## HTTP-only Python example
