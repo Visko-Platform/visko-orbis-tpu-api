@@ -124,7 +124,7 @@ function App() {
       await run.transport.sendCommand(name, data);
       if (run.cancelled || before !== commandErrors.current) return;
       if (name === 'set_paused') setPaused(Boolean(data.paused));
-      setNotice(name === 'set_prompt' ? 'Prompt update sent. Buffered video may take a moment to catch up.' : `${data.paused ? 'Pause' : 'Resume'} request sent.`);
+      setNotice(name === 'set_prompt' ? 'Prompt update sent.' : `${data.paused ? 'Pause' : 'Resume'} request sent.`);
     } catch { setError('The command could not be sent. Please try again.'); }
     finally { setBusy(false); }
   }
