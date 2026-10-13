@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Reactor } from '@reactor-team/js-sdk';
-import { API_URL, Session, request } from './session';
+import { API_URL, Session, request, isStartFailure, START_FAILURE_MESSAGE } from './session';
 import { SessionTimer } from './SessionTimer';
 import './style.css';
 
-type Phase = 'idle' | 'joining' | 'waiting' | 'connecting' | 'live' | 'leaving' | 'release-error';
+type Phase = 'idle' | 'joining' | 'waiting' | 'connecting' | 'live' | 'start-failed' | 'leaving' | 'release-error';
 const ideas = [
   { name: 'Into the wild', tag: 'NATURE', prompt: 'A red fox walking through a snowy pine forest at dawn. Soft golden light filters through the trees, snowflakes drift slowly, cinematic tracking shot.' },
   { name: 'After hours', tag: 'CINEMATIC', prompt: 'A quiet Tokyo street at night in the rain. Neon signs reflected in puddles, steam rising from a small ramen shop, slow cinematic dolly forward.' },
@@ -72,7 +72,14 @@ function App() {
         });
         transport.on('error', () => {
           commandErrors.current++;
-          if (!run.cancelled) setError('Orbis reported a stream or command error. Retry the control, or leave and start a new session.');
+          if (!run.cancelled && !run.startFailed) setError('Orbis reported a stream or command error. Retry the control, or leave and start a new session.');
+        });
+        transport.on('message', raw => {
+          if (run.cancelled || active.current !== run || !isStartFailure(raw)) return;
+          run.startFailed = true;
+          setError(START_FAILURE_MESSAGE);
+          setNotice(''); setBusy(false); setPaused(false);
+          setPhase('start-failed'); setStatus('Generation failed to start');
         });
         transport.on('statusChanged', value => {
           if (!run.cancelled && value === 'disconnected') {
@@ -88,8 +95,8 @@ function App() {
         setStatus(ticket.status === 'waiting' ? `In queue · position ${ticket.position}` : 'Connecting your stream…');
       });
       if (run.cancelled) return;
-      if (commandErrors.current !== initialErrors) { await leave(run); return; }
-      setPhase('live'); setStatus('Session connected');
+      if (!run.startFailed && commandErrors.current !== initialErrors) { await leave(run); return; }
+      if (!run.startFailed) { setPhase('live'); setStatus('Session connected'); }
       let checking = false;
       const checkStatus = async () => {
         if (checking || run.cancelled) return;
@@ -114,6 +121,23 @@ function App() {
       if (!run.cancelled) setError(err instanceof Error ? err.message : 'Could not start this session.');
       await leave(run);
     }
+  }
+  async function retryStart() {
+    const run = active.current;
+    if (!run?.transport || run.cancelled || busy || !prompt.trim()) return;
+    run.startFailed = false;
+    setBusy(true); setError(''); setNotice('');
+    setPhase('connecting'); setStatus('Starting generation…');
+    try {
+      await run.transport.sendCommand('start', { prompt: prompt.trim() });
+      if (!run.cancelled && !run.startFailed) { setPhase('live'); setStatus('Session connected'); }
+    } catch {
+      if (!run.cancelled) {
+        run.startFailed = true;
+        setPhase('start-failed'); setStatus('Generation failed to start');
+        setError(START_FAILURE_MESSAGE);
+      }
+    } finally { setBusy(false); }
   }
   async function command(name: string, data: Record<string, unknown>) {
     const run = active.current;
@@ -141,17 +165,17 @@ function App() {
           <div className="ideas-label">A PLACE TO START <span>↙</span></div>
           <div className="ideas">{ideas.map((idea, index) => <button className={`idea idea-${index}`} key={idea.name} onClick={() => setPrompt(idea.prompt)}><span className="idea-art" aria-hidden="true">{['✳', '▥', '✧'][index]}</span><span><small>{idea.tag}</small>{idea.name}</span><span className="idea-arrow">↗</span></button>)}</div>
           <div className="key-field"><label htmlFor="key">Your Orbis API key <span>REQUIRED</span></label><input id="key" type="password" autoComplete="off" spellCheck={false} value={key} disabled={joined} onChange={e => setKey(e.target.value)} placeholder="Enter your API key"/><p className="field-hint">Used only for this session. Never saved in your browser.</p></div>
-          {!joined ? <button className="primary" disabled={!key.trim() || !prompt.trim()} onClick={() => void start()}>Start creating <span>↗</span></button> : <div className="session-actions"><button className="primary" disabled={!live || busy || !prompt.trim()} onClick={() => void command('set_prompt', { prompt: prompt.trim() })}>Update scene <span>↗</span></button><button className="secondary" disabled={phase === 'leaving'} onClick={() => void leave()}>{phase === 'waiting' || phase === 'joining' ? 'Cancel' : 'Leave'}</button></div>}
+          {!joined ? <button className="primary" disabled={!key.trim() || !prompt.trim()} onClick={() => void start()}>Start creating <span>↗</span></button> : <div className="session-actions"><button className="primary" disabled={(phase !== 'start-failed' && !live) || busy || !prompt.trim()} onClick={() => phase === 'start-failed' ? void retryStart() : void command('set_prompt', { prompt: prompt.trim() })}>{phase === 'start-failed' ? 'Try again' : 'Update scene'} <span>↗</span></button><button className="secondary" disabled={phase === 'leaving'} onClick={() => void leave()}>{phase === 'waiting' || phase === 'joining' ? 'Cancel' : 'Leave'}</button></div>}
           <p className="bottom-hint">Live video + audio · One continuous session</p>
         </section>
         <section className="stage" aria-label="Live preview">
-          <div className="preview-top"><div className="section-heading"><span className="step">02</span><h2>Your canvas</h2></div><span className={`status-pill ${live ? 'is-live' : ''}`}><i/>{live ? 'LIVE SESSION' : phase === 'idle' ? 'STANDBY' : 'CONNECTING'}</span></div>
+          <div className="preview-top"><div className="section-heading"><span className="step">02</span><h2>Your canvas</h2></div><span className={`status-pill ${live ? 'is-live' : ''}`}><i/>{live ? 'LIVE SESSION' : phase === 'start-failed' ? 'START FAILED' : phase === 'idle' ? 'STANDBY' : 'CONNECTING'}</span></div>
           <div className={`viewport ${hasVideo ? 'has-video' : ''}`}>
             <video ref={video} autoPlay muted playsInline controls aria-label="Live generated video"/>
             {!hasVideo && <div className="empty-canvas"><div className="orbit" aria-hidden="true"><div/><span>✦</span></div><h3>{joined ? status : 'Every world starts with a few words.'}</h3><p>{joined ? 'Your live video will appear here.' : 'Describe your scene, add your key, and let it unfold.'}</p><span className="canvas-label">IMAGINATION, IN REAL TIME</span></div>}
           </div>
           <div className="player-toolbar"><span className="player-status" role="status"><i className={live ? 'is-live' : ''}/>{status}</span><div>{sessionTime && <SessionTimer deadline={sessionTime.deadline} limit={sessionTime.limit}/>}<button className="text-button" disabled={!live || busy} onClick={() => void command('set_paused', { paused: !paused })}>{paused ? '▷ Resume' : 'Ⅱ Pause'}</button></div></div>
-          <div className="stage-footnote"><span>1920 × 1080 <b>·</b> LIVE AUDIO</span><span>Unmute in player</span></div>
+          <div className="stage-footnote"><span>3840 × 2160 (4K) <b>·</b> LIVE AUDIO</span><span>Unmute in player</span></div>
           {error && <div className="message error" role="alert">{error}</div>}{notice && <div className="message" role="status">{notice}</div>}
         </section>
       </div>

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { ApiError, Session, type Ticket } from './session';
+import { ApiError, Session, isStartFailure, type Ticket } from './session';
 const ticket = (status: Ticket['status']): Ticket => ({ session_token: 'test-session', status, position: 1, expires_in: 30, session_seconds: 300 });
 const immediate = async () => {};
 function transport(events: string[]) { return { connect: async (token: string) => { events.push(`connect:${token}`); }, disconnect: async () => { events.push('disconnect'); }, sendCommand: async (command: string) => { events.push(command); } }; }
@@ -49,4 +49,14 @@ test('cancelling during connect prevents start and disconnects after connect fin
   const leaving = run.leave(); finish();
   await Promise.all([starting, leaving]);
   assert.deepEqual(events, ['/join', '/leave', 'disconnect']);
+});
+
+test('recognizes failed starts in model, wire, and flattened messages', () => {
+  const message = { type: 'command_error', data: { command: 'start', reason: 'Generation failed to start. Please try again later.' } };
+  assert.equal(isStartFailure(message), true);
+  assert.equal(isStartFailure({ scope: 'application', data: message }), true);
+  assert.equal(isStartFailure({ type: 'command_error', command: 'start' }), true);
+  assert.equal(isStartFailure({ type: 'command_error', data: { command: 'set_prompt' } }), false);
+  assert.equal(isStartFailure({ type: 'state' }), false);
+  assert.equal(isStartFailure(null), false);
 });

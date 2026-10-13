@@ -28,6 +28,8 @@ Open the localhost URL printed by Vite, enter your Orbis API key and a prompt,
 and select **Start creating**. Unmute the player to hear audio. Update the scene
 or pause/resume while connected, and select **Leave** to end the session or cancel
 your queue position. The timer uses the session duration returned by the API.
+If generation fails to start, the app displays “Generation failed to start.
+Please try again later.” and offers **Try again** or **Leave**.
 Keys and session tokens stay in memory; no `.env` file is required.
 
 The sample implements admission and release in [src/session.ts](src/session.ts),
@@ -428,7 +430,7 @@ request bodies to `/join` or `/status`.
 
 Incoming tracks are named `main_video` and `main_audio`. Add both to a
 `MediaStream` attached to a `<video>` element, as in the example. Current output
-is 1920×1080 (1080p) with mono audio transported at 48 kHz. HTTPS carries API
+is 3840×2160 (4K) with mono audio transported at 48 kHz. HTTPS carries API
 calls and signalling; WebRTC carries media and stream commands.
 
 ## HTTP-only Python example

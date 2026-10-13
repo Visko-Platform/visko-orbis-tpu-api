@@ -390,9 +390,36 @@ imposed on user prompts. Already buffered chunks retain their previous prompt;
 updates may take a moment to appear. Send commands over the stream, not as
 request bodies to `/join` or `/status`.
 
+### Initial generation failure
+
+An accepted `start` command does not guarantee generation will begin. If initial
+generation fails, the server sends this application message over the stream:
+
+```json
+{
+  "type": "command_error",
+  "data": {
+    "command": "start",
+    "reason": "Generation failed to start. Please try again later."
+  }
+}
+```
+
+On the wire, this message is wrapped in
+`{ "scope": "application", "data": <message above> }`. Depending on the client,
+the SDK may already unwrap that envelope. Listen for application `message`
+events as well as SDK `error` events, and display the `reason` to the user. This
+notification can arrive after `sendCommand("start", ...)` has resolved.
+
+Stop any generation-start loading indicator when this error arrives. The session
+remains connected and generation has not started; the user can try `start` again
+later with the same session, provided it has not expired. Do not retry
+automatically in a tight loop. Use `/leave` if the user chooses to exit instead.
+This response contains no internal failure details.
+
 Incoming tracks are named `main_video` and `main_audio`. Add both to a
 `MediaStream` attached to a `<video>` element, as in the example. Current output
-is 1920×1080 (1080p) with mono audio transported at 48 kHz. HTTPS carries API
+is 3840×2160 (4K) with mono audio transported at 48 kHz. HTTPS carries API
 calls and signalling; WebRTC carries media and stream commands.
 
 ## HTTP-only Python example

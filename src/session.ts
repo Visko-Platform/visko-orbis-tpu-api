@@ -1,3 +1,15 @@
+export const START_FAILURE_MESSAGE = 'Generation failed to start. Please try again later.';
+export function isStartFailure(raw: unknown): boolean {
+  if (!raw || typeof raw !== 'object') return false;
+  let message = raw as Record<string, unknown>;
+  if (message.scope === 'application' && message.data && typeof message.data === 'object') {
+    message = message.data as Record<string, unknown>;
+  }
+  if (message.type !== 'command_error') return false;
+  const detail = message.data && typeof message.data === 'object' ? message.data as Record<string, unknown> : message;
+  return detail.command === 'start';
+}
+
 export const API_URL = 'https://orbis-stable-tpu.visko.ai';
 export interface Ticket { session_token: string; status: 'waiting' | 'active' | 'releasing'; position: number; expires_in: number | null; session_seconds: number }
 export class ApiError extends Error {
@@ -14,6 +26,7 @@ export interface Transport { connect(token: string): Promise<void>; disconnect()
 export class Session {
   token = '';
   cancelled = false;
+  startFailed = false;
   transport?: Transport;
   joining?: Promise<Ticket>;
   connecting?: Promise<void>;
